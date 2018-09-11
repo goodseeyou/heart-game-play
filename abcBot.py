@@ -48,6 +48,9 @@ class AbcBot:
         for cardString in self_cards:
             self.playersDict[self.botName].handCards[Card.cardInstanceIndex(cardString)] = 1
 
+    def receive_opponent_cards(self, cards):
+        self.receive_cards(cards)
+
     def _get_player(self, playerName):
         return self.playersDict[str(playerName)]
 
