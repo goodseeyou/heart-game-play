@@ -1,7 +1,8 @@
 #coding=UTF-8
-from abc import abstractmethod
 
 from websocket import create_connection
+from Bot import PokerBot
+from abcBot import AbcBot
 import json
 import logging
 import sys
@@ -24,196 +25,35 @@ class Log(object):
     def save_logs(self,msg):
         self.logger.info(msg)
 
-IS_DEBUG=True
+IS_DEBUG=False
 system_log=Log(IS_DEBUG)
-
-
-class PokerBot(object):
-
-    def __init__(self,player_name):
-        self.round_cards_history=[]
-        self.pick_his={}
-        self.round_cards = {}
-        self.score_cards={}
-        self.player_name=player_name
-        self.players_current_picked_cards=[]
-        self.game_score_cards = {Card("QS"), Card("TC"), Card("2H"), Card("3H"), Card("4H"), Card("5H"), Card("6H"),
-                           Card("7H"), Card("8H"), Card("9H"), Card("TH"), Card("JH"), Card("QH"), Card("KH"),
-                           Card("AH")}
-    #@abstractmethod
-    def receive_cards(self,data):
-        err_msg = self.__build_err_msg("receive_cards")
-        raise NotImplementedError(err_msg)
-    def pass_cards(self,data):
-        err_msg = self.__build_err_msg("pass_cards")
-        raise NotImplementedError(err_msg)
-    def pick_card(self,data):
-        err_msg = self.__build_err_msg("pick_card")
-        raise NotImplementedError(err_msg)
-    def expose_my_cards(self,yourcards):
-        err_msg = self.__build_err_msg("expose_my_cards")
-        raise NotImplementedError(err_msg)
-    def expose_cards_end(self,data):
-        err_msg = self.__build_err_msg("expose_cards_announcement")
-        raise NotImplementedError(err_msg)
-    def receive_opponent_cards(self,data):
-        err_msg = self.__build_err_msg("receive_opponent_cards")
-        raise NotImplementedError(err_msg)
-    def round_end(self,data):
-        err_msg = self.__build_err_msg("round_end")
-        raise NotImplementedError(err_msg)
-    def deal_end(self,data):
-        err_msg = self.__build_err_msg("deal_end")
-        raise NotImplementedError(err_msg)
-    def game_over(self,data):
-        err_msg = self.__build_err_msg("game_over")
-        raise NotImplementedError(err_msg)
-    def pick_history(self,data,is_timeout,pick_his):
-        err_msg = self.__build_err_msg("pick_history")
-        raise NotImplementedError(err_msg)
-
-    def reset_card_his(self):
-        self.round_cards_history = []
-        self.pick_his={}
-
-    def get_card_history(self):
-        return self.round_cards_history
-
-    def turn_end(self,data):
-        turnCard=data['turnCard']
-        turnPlayer=data['turnPlayer']
-        players=data['players']
-        is_timeout=data['serverRandom']
-        for player in players:
-            player_name=player['playerName']
-            if player_name==self.player_name:
-                current_cards=player['cards']
-                for card in current_cards:
-                    self.players_current_picked_cards.append(Card(card))
-        self.round_cards[turnPlayer]=Card(turnCard)
-        opp_pick={}
-        opp_pick[turnPlayer]=Card(turnCard)
-        if (self.pick_his.get(turnPlayer))!=None:
-            pick_card_list=self.pick_his.get(turnPlayer)
-            pick_card_list.append(Card(turnCard))
-            self.pick_his[turnPlayer]=pick_card_list
-        else:
-            pick_card_list = []
-            pick_card_list.append(Card(turnCard))
-            self.pick_his[turnPlayer] = pick_card_list
-        self.round_cards_history.append(Card(turnCard))
-        self.pick_history(data,is_timeout,opp_pick)
-
-    def get_cards(self,data):
-        try:
-            receive_cards=[]
-            players=data['players']
-            for player in players:
-                if player['playerName']==self.player_name:
-                    cards=player['cards']
-                    for card in cards:
-                        receive_cards.append(Card(card))
-                    break
-            return receive_cards
-        except Exception, e:
-            system_log.show_message(e.message)
-            return None
-
-    def get_round_scores(self,is_expose_card=False,data=None):
-        if data!=None:
-            players=data['roundPlayers']
-            picked_user = players[0]
-            round_card = self.round_cards.get(picked_user)
-            score_cards=[]
-            for i in range(len(players)):
-                card=self.round_cards.get(players[i])
-                if card in self.game_score_cards:
-                    score_cards.append(card)
-                if round_card.suit_index==card.suit_index:
-                    if round_card.value<card.value:
-                        picked_user = players[i]
-                        round_card=card
-            if (self.score_cards.get(picked_user)!=None):
-                current_score_cards=self.score_cards.get(picked_user)
-                score_cards+=current_score_cards
-            self.score_cards[picked_user]=score_cards
-            self.round_cards = {}
-
-        receive_cards={}
-        for key in self.pick_his.keys():
-            picked_score_cards=self.score_cards.get(key)
-            round_score = 0
-            round_heart_score=0
-            is_double = False
-            if picked_score_cards!=None:
-                for card in picked_score_cards:
-                    if card in self.game_score_cards:
-                        if card == Card("QS"):
-                            round_score += -13
-                        elif card == Card("TC"):
-                            is_double = True
-                        else:
-                            round_heart_score += -1
-                if is_expose_card:
-                    round_heart_score*=2
-                round_score+=round_heart_score
-                if is_double:
-                    round_score*=2
-            receive_cards[key] = round_score
-        return receive_cards
-
-    def get_deal_scores(self, data):
-        try:
-            self.score_cards = {}
-            final_scores  = {}
-            initial_cards = {}
-            receive_cards = {}
-            picked_cards  = {}
-            players = data['players']
-            for player in players:
-                player_name     = player['playerName']
-                palyer_score    = player['dealScore']
-                player_initial  = player['initialCards']
-                player_receive  = player['receivedCards']
-                player_picked   = player['pickedCards']
-
-                final_scores[player_name] = palyer_score
-                initial_cards[player_name] = player_initial
-                receive_cards[player_name]=player_receive
-                picked_cards[player_name]=player_picked
-            return final_scores, initial_cards,receive_cards,picked_cards
-        except Exception, e:
-            system_log.show_message(e.message)
-            return None
-
-    def get_game_scores(self,data):
-        try:
-            receive_cards={}
-            players=data['players']
-            for player in players:
-                player_name=player['playerName']
-                palyer_score=player['gameScore']
-                receive_cards[player_name]=palyer_score
-            return receive_cards
-        except Exception, e:
-            system_log.show_message(e.message)
-            return None
 
 class PokerSocket(object):
     ws = ""
 
-    def __init__(self,player_name,player_number,token,connect_url,poker_bot):
-        self.player_name=player_name
-        self.connect_url=connect_url
-        self.player_number=player_number
-        self.poker_bot=poker_bot
-        self.token=token
+    def __init__(self, player_name, player_number, token, connect_url, poker_bot):
+        self.player_name = player_name
+        self.connect_url = connect_url
+        self.player_number = player_number
+        self.poker_bot = poker_bot
+        self.token = token
 
-    def takeAction(self,action, data):
-       if  action=="new_deal":
-           self.poker_bot.receive_cards(data)
+    def takeAction(self, action, data):
+        if action == "new_game":
+            self.poker_bot.new_game(data)
+
+        if action == "new_deal":
+            self.poker_bot.new_deal(data)
+
+
+
+       if  action=='new_game':
+           self.poker_bot.new_game()
+       elif action=="new_deal":
+           self.poker_bot.init_players(data['players'])
+           self.poker_bot.receive_cards(data['self']['cards'])
        elif action=="pass_cards":
-           pass_cards=self.poker_bot.pass_cards(data)
+           pass_cards=self.poker_bot.pass_cards(data['receiver'])
            self.ws.send(json.dumps(
                 {
                     "eventName": "pass_my_cards",
@@ -223,22 +63,27 @@ class PokerSocket(object):
                     }
                 }))
        elif action=="receive_opponent_cards":
-           self.poker_bot.receive_opponent_cards(data)
+           self.poker_bot.receive_opponent_cards(data['receivedCards'])
        elif action=="expose_cards":
-           export_cards = self.poker_bot.expose_my_cards(data)
-           if export_cards!=None:
-               self.ws.send(json.dumps(
-                   {
-                       "eventName": "expose_my_cards",
-                       "data": {
-                           "dealNumber": data['dealNumber'],
-                           "cards": export_cards
-                       }
-                   }))
+           export_cards = self.poker_bot.expose_my_cards()
+           if not export_cards:
+               export_cards = []
+           self.ws.send(json.dumps(
+               {
+                   "eventName": "expose_my_cards",
+                   "data": {
+                       "dealNumber": data['dealNumber'],
+                       "cards": export_cards
+                   }
+               }))
        elif action=="expose_cards_end":
-           self.poker_bot.expose_cards_end(data)
+           self.poker_bot.expose_cards_end(data['players'])
+       elif action=="new_round":
+           self.poker_bot.new_round(data['players'])
+       elif action=="turn_end":
+           self.poker_bot.turn_end(data)
        elif action=="your_turn":
-           pick_card = self.poker_bot.select_card(data)
+           pick_card = self.poker_bot.select_card()
            message="Send message:{}".format(json.dumps(
                 {
                    "eventName": "pick_card",
@@ -262,10 +107,12 @@ class PokerSocket(object):
        elif action=="turn_end":
            self.poker_bot.turn_end(data)
        elif action=="round_end":
-           self.poker_bot.round_end(data)
+           pass
+           #self.poker_bot.round_end(data)
        elif action=="deal_end":
-           self.poker_bot.deal_end(data)
-           self.poker_bot.reset_card_his()
+           pass
+           #self.poker_bot.deal_end(data)
+           #self.poker_bot.reset_card_his()
        elif action=="game_end":
            self.poker_bot.game_over(data)
            self.ws.close()
@@ -461,7 +308,8 @@ def main():
         player_number=99
         token="12345678"
         connect_url="ws://localhost:8080/"
-    sample_bot=LowPlayBot(player_name)
+    #sample_bot=LowPlayBot(player_name)
+    sample_bot=AbcBot(player_name, 0, 0)
     myPokerSocket=PokerSocket(player_name,player_number,token,connect_url,sample_bot)
     myPokerSocket.doListen()
 

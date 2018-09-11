@@ -1,78 +1,144 @@
+from Card import Card
+
+# action number for passing card
+NUM_C52_3 = 22100
+# action number for expose AH card
+NUM_C2_1 = 2
+# action number for select card
+NUM_C52_1 = 52
+
+NUM_TOTAL_ACTION = NUM_C52_3 + NUM_C2_1 + NUM_C52_1
 
 class AbcBot:
-    def __init__(self, botNumber):
+    def __init__(self, botName, nn, mcts):
         """
-        :param botNumber: Unique value during AI contest for player recognition
-        """
-        self.gameInstance = None
-        self.players = {}
-        self.botNumber = botNumber
-
-    def new_game(self, players):
-        """
-        Initiate new Game Sate
-        set Player with index
-        :return:
+        :param botName: bot name during AI contest for player recognition
         """
         self.gameInstance = GameInstance()
-        self._set_players(players)
+        self.playersDict = {}
+        self.playersList = []
+        self.botName = botName
+        self.currentRound = None
+        self.nn = nn
+        self.mcts = mcts
+        self.trainGameInstances = []
 
-    def _set_players(self, players):
-        for i in range(4):
-            if self.botNumber == players[i]['playerNumber']:
+    def new_game(self):
+        self.trainGameInstances = []
+
+    def init_players(self, server_players):
+        self.len_players = len(server_players)
+        for i in range(self.len_players):
+            if self.botName == server_players[i]['playerName']:
                 diffIndex = i
                 break
-        for i in range(4):
-            playerNumber = str(players[i]['playerNumber'])
+        for i in range(self.len_players):
+            playerName = str(server_players[i]['playerName'])
             index = (i - diffIndex) % 4
-            self.players[playerNumber] = Player(playerNumber, index)
+            player = Player(playerName, index)
+            player.gameScore = server_players[i]['gameScore']
+            player.dealScore = server_players[i]['dealScore']
+            self.playersDict[playerName] = player
 
+        _players_i_p = sorted([(self.playersDict[playerName].playerIndex, self.playersDict[playerName]) for playerName in self.playersDict], key=lambda x: x[0])
+        for i, p in _players_i_p:
+            self.playersList.append(p)
 
-VAL_PICKED = -1
-VAL_NO_OR_UNKNOWN_CARD = 0
-VAL_HAVE_CARD = 1
-VAL_YES = 1
-VAL_NO = 0
+    def receive_cards(self, self_cards):
+        for cardString in self_cards:
+            self.playersDict[self.botName].handCards[Card.cardInstanceIndex(cardString)] = 1
 
+    def _get_player(self, playerName):
+        return self.playersDict[str(playerName)]
 
-class Player:
-    def __init__(self, playerNumber, playerIndex):
-        """
-        :param playerNumber: Unique value during AI contest for player recognition
-        :param playerIndex: The order in the game according to self player
-        """
-        self.playerNumber = playerNumber
-        self.playerIndex = playerIndex
-        self.gameScore = 0
-        self.dealScore = 0
-        self.exposeAH = VAL_NO
-        self.handCards = getCardsArray()
+    def pass_cards(self, receiverPlayerName):
+        self.currentRound = Round()
+        receiver = self._get_player(receiverPlayerName)
+        self.currentRound.passCardToPlayer(receiver)
+        roundInstance = genRoundInstance(self.currentRound, self.playersList)
+        gameInstance = self.gameInstance.addNewRoundInstance(roundInstance)
 
-    def receivedCards(self, cards):
-        for card in cards:
-            self.handCards[card.instanceIndex] = VAL_HAVE_CARD
+        cardStringList = self._predict_pass_cards(gameInstance)
+        CardList = [Card(cardString) for cardString in cardStringList]
+        self.playersList[0].pass_cards(CardList)
+        return cardStringList
 
-    def passCards(self, cards):
-        for card in cards:
-            self.pickCard(card)
+    # TODO
+    def _predict_pass_cards(self, gameInstance):
+        print 'pass card', gameInstance.roundInstances[0]
+        self.trainGameInstances.append(gameInstance.gameInstance)
+        return ["AH"] * 3
 
-    def pickCard(self, card):
-        self.handCards[card.instanceIndex] = VAL_PICKED
+    def receive_opponent_cards(self, cardStringList):
+        self.playersList[0].received_cards([Card(cardString) for cardString in cardStringList])
 
-    def exposeCardAH(self):
-        self.exposeAH = VAL_YES
+    def expose_my_cards(self):
+        self.currentRound = self.currentRound.newRound()
+        roundInstance = genRoundInstance(self.currentRound, self.playersList)
+        gameInstance = self.gameInstance.addNewRoundInstance(roundInstance)
 
-    def resetDeal(self):
-        self.dealScore = 0
-        self.exposeAH = VAL_NO
-        self.handCards = getCardsArray()
+        cardStringList = self._predict_expose_cards(gameInstance)
+        if cardStringList:
+            self.playersList[0].expose_card()
 
-    def copy(self):
-        _p = Player(self.playerNumber, self.playerIndex)
-        _p.gameScore, _p.dealScore, _p.exposeAH, _p.handCards = \
-            self.gameScore, self.dealScore, self.exposeAH, self.handCards[:]
-        return _p
+        return cardStringList
 
+    # TODO
+    def _predict_expose_cards(self, gameInstance):
+        print 'expose card', gameInstance.roundInstances[0]
+        self.trainGameInstances.append(gameInstance.gameInstance)
+        return ["AH"]
+        pass
+
+    def expose_cards_end(self, server_players):
+        for server_player in server_players:
+            if server_player['exposedCards']:
+                self._get_player(server_player['playerName']).expose_card()
+
+    def new_round(self, server_players):
+        self.currentRound = self.currentRound.newRound()
+        self.currentRound.stateBeginRound()
+        for server_player in server_players:
+            player = self._get_player(server_player['playerName'])
+            player.gameScore = server_player['gameScore']
+            player.dealScore = server_player['dealScore']
+
+    def turn_end(self, data):
+        first_player = data['roundPlayers'][0]
+        turn_player = data['turnPlayer']
+        turn_card_string = data['turnCard']
+        turnCard = Card(turn_card_string)
+
+        if first_player == turn_player:
+            self.currentRound.setFirstCard(turnCard)
+
+        self._get_player(turn_player).pick_card(turnCard)
+
+    def select_card(self):
+        roundInstance = genRoundInstance(self.currentRound, self.playersList)
+        gameInstance = self.gameInstance.addNewRoundInstance(roundInstance)
+        selectCardString = self._predict_pick_card(gameInstance)
+        self.playersList[0].pick_card(Card(selectCardString))
+
+        return selectCardString
+
+    # TODO
+    def _predict_pick_card(self, gameInstance):
+        print 'pick card', gameInstance.roundInstances[0]
+        self.trainGameInstances.append(gameInstance.gameInstance)
+        return "AH"
+        pass
+
+    def game_over(self, server_players):
+        for server_player in server_players:
+            player = self._get_player(server_player['playerName'])
+            player.gameScore = server_player['gameScore']
+            if 1 == server_player['rank']:
+                winner = player.playerIndex
+
+        label = winner == 0
+        for i in self.trainGameInstances:
+            print '%s\t%s'%(label, i)
 
 class Round:
     def __init__(self):
@@ -92,57 +158,12 @@ class Round:
     def setFirstCard(self, card):
         self.firstCardInRound = card
 
-    def copy(self):
+    def newRound(self):
         _r = Round()
-        _r.roundState, _r.firstCardInRound = self.roundState[:], self.firstCardInRound
+        _r.roundState, _r.firstCardInRound = self.roundState[:], None
         return _r
 
 
-LEN_STATE_HISTORY = 16
-LEN_ROUND_INSTANCE = 4+4+4+4+52+52+52+52+52
-
-
-class RoundInstance:
-    def __init__(self, roundNumber, instance):
-        self.roundNumber = roundNumber
-        self.instance = instance
-
-
-from collections import deque
-
-
-class GameInstance:
-    def __init__(self):
-        self.roundInstances = deque([], LEN_STATE_HISTORY)
-        self.gameInstance = [VAL_NO] * LEN_ROUND_INSTANCE * LEN_STATE_HISTORY
-
-    def addNewRoundInstance(self, roundInstance):
-        self.roundInstances.appendleft(roundInstance)
-        self.gameInstance = self.gameInstance[:-LEN_ROUND_INSTANCE]
-        self.gameInstance += self.roundInstances
 
 
 
-def genRoundInstance(_round, players):
-    gameScore = [player.gameScore for player in players]
-    dealScore = [player.dealScore for player in players]
-    exposeAH = [player.exposeAH for player in players]
-    roundState = _round.roundState
-    roundFirstCard = getCardsArray(_round.firstCardInRound)
-    playersHandCards = [player.handCards for player in players]
-
-    _instance = gameScore + dealScore + exposeAH + roundState + roundFirstCard + \
-        playersHandCards[0] + playersHandCards[1] + playersHandCards[2] + playersHandCards[3]
-
-    return _instance
-
-
-EMPTY_CARDS = [VAL_NO_OR_UNKNOWN_CARD]*52
-
-
-def getCardsArray(card=None):
-    if card is None:
-        return EMPTY_CARDS[:]
-    _tmp = EMPTY_CARDS[:]
-    _tmp[card.instanceIndex] = VAL_YES
-    return _tmp
