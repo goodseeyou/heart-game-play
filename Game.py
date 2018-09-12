@@ -7,7 +7,7 @@ VAL_YES = 1
 VAL_NO = 0
 
 EMPTY_CARDS = [VAL_NO_OR_UNKNOWN_CARD]*52
-EMPTY_ROUND_HEADER = [0] * 4
+EMPTY_ROUND_HEADER = [0] * 5
 
 
 class Player:
@@ -22,8 +22,9 @@ class Player:
         self.deal_score = 0
         self.does_expose = VAL_NO
         self.hand_card_list = get_cards_array()
+        self.scored_card_list = get_cards_array()
 
-    def received_cards(self, cards):
+    def receive_cards(self, cards):
         for card in cards:
             self.hand_card_list[card.instanceIndex] = VAL_HAVE_CARD
 
@@ -37,10 +38,15 @@ class Player:
     def expose_card(self):
         self.does_expose = VAL_YES
 
+    def get_scored_card(self, cards):
+        for card in cards:
+            self.scored_card_list[card.instanceIndex] = VAL_HAVE_CARD
+
     def new_deal(self):
         self.deal_score = 0
         self.does_expose = VAL_NO
         self.hand_card_list = get_cards_array()
+        self.scored_card_list = get_cards_array()
 
     def copy(self):
         _p = Player(self.player_name, self.player_index)
@@ -57,20 +63,23 @@ class RoundState:
         """
         self.passing = VAL_NO
         self.picking = VAL_NO
+        self.exposing = VAL_NO
         self.first_cards = get_cards_array()
 
     def header(self):
         """
-        bit 1: picking (0/1)
-        bit 2: pass to player 1 (0/1)
-        bit 3: pass to player 2 (0/1)
-        bit 4: pass to player 3 (0/1)
+        bit 0: picking (0/1)
+        bit 1: pass to player 1 (0/1)
+        bit 2: pass to player 2 (0/1)
+        bit 3: pass to player 3 (0/1)
+        bit 4: expose card (0/1)
         bit 5~57: first picked card in round
         :return: list of binary
         """
         header = EMPTY_ROUND_HEADER[:]
         header[self.passing] = VAL_YES
         header[0] = self.picking
+        header[4] = self.exposing
         header += self.first_cards
         return header
 
@@ -80,9 +89,12 @@ class RoundState:
     def begin_pick(self):
         self.picking = VAL_YES
 
+    def begin_expose(self):
+        self.exposing = VAL_YES
+
     def inherit(self):
         rs = RoundState()
-        rs.passing, rs.picking = self.passing, self.picking
+        rs.passing, rs.picking, rs.exposing = self.passing, self.picking, self.exposing
         return rs
 
     def copy(self):
@@ -95,7 +107,7 @@ class RoundState:
 class BoardInstance:
     LEN_STATE_HISTORY = 16
     LEN_ROUND_STATE_INSTANCE = 4+52
-    LEN_PLAYER_INSTANCE = 1+1+1+52
+    LEN_PLAYER_INSTANCE = 1+1+1+52+52
     LEN_BOARD_SIZE = LEN_STATE_HISTORY * (LEN_ROUND_STATE_INSTANCE + LEN_PLAYER_INSTANCE)
 
     def __init__(self):
@@ -120,7 +132,7 @@ class BoardInstance:
         _players_instance = []
         for player in players:
             _players_instance.append([player.player_index, player.game_score, player.deal_score, player.does_expose]
-                                     + player.hand_card_list)
+                                     + player.hand_card_list + player.scored_card_list)
 
         players_instance = []
         for pi in sorted(_players_instance, key=lambda x: x[0]):
@@ -149,7 +161,9 @@ class BoardInstance:
             deal_score = pi[1]
             does_expose = pi[2]
             hand_cards = pi[3:55]
+            scored_cards = pi[55:107]
             player.hand_card_list = hand_cards
+            player.scored_card_list = scored_cards
             player.does_expose = does_expose
             player.deal_score = deal_score
             player.game_score = game_score

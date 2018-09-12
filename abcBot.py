@@ -23,7 +23,7 @@ class AbcBot:
         self.mcts = mcts
         self.trainGameInstances = []
 
-    def new_game(self):
+    def new_game(self, server_players):
         self.trainGameInstances = []
 
     def init_players(self, server_players):

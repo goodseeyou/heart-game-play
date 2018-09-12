@@ -21,7 +21,7 @@ class GameEngine:
         for bot in self.bots:
             bot.new_game(self.bots_name)
 
-        for i in range(4):
+        for _ in range(4):
             self.deal_num += 1
             self.start_deal()
 
@@ -38,11 +38,14 @@ class GameEngine:
         self.init_give_cards()
         self.pass_cards()
         self.expose_cards()
-        for i in range(13):
+        for _ in range(13):
+            self.new_round()
             self.start_round()
+            for bot in self.bots:
+                bot.round_end(self.bots)
 
         for bot in self.bots:
-            bot.deal_end()
+            bot.deal_end(self.bots)
 
     def wash_cards(self):
         self.cards = Game.CARD_STRING_INSTANCE_INDEX[:]
@@ -62,15 +65,17 @@ class GameEngine:
         _receivers = []
         for i in range(1, 4):
             bot = self.bots[i % 4]
+            sender_name = bot.name
             receiver = self.bots[(i+self.deal_num) % 4]
             cards = bot.pass_cards(receiver.name)
-            _receivers.append((receiver, cards, ))
+            _receivers.append((sender_name, receiver, cards, ))
 
-        for receiver, cards in _receivers:
-            receiver.receive_cards(cards)
+        for sender_name, receiver, cards in _receivers:
+            receiver.receive_opponent_cards(sender_name, cards)
 
     def expose_cards(self):
         _bool = None
+        _name = None
         for bot in self.bots:
             if CARD_AH in bot.cards and bot.cards[CARD_AH] == 1:
                 _bool = bot.expose_cards()
@@ -78,6 +83,7 @@ class GameEngine:
                 break
 
         assert(_bool is not None)
+        assert(_name is not None)
 
         if _bool:
             self.heart_multiple *= 2
@@ -89,10 +95,16 @@ class GameEngine:
         round_card_bot = []
         for i in range(4):
             bot = self.bots[(i+bot_index) % 4]
-            card = bot.pick(self)
+            card = bot.pick()
+            for _bot in self.bots:
+                _bot.played(bot.name, card)
             round_card_bot.append((card, bot, ))
 
         self.scored_cards(round_card_bot)
+
+    def new_round(self):
+        for bot in self.bots:
+            bot.new_round()
 
     def choose_first_bot_index(self):
         if self.leader_bot is None:
@@ -115,7 +127,7 @@ class GameEngine:
                 hold_bot = bot
                 lead_card = card
 
-        hold_bot.score_card(cards)
+        hold_bot.get_score_cards(cards)
 
     def end_game(self):
         winner = sorted([(bot.game_score, bot) for bot in self.bots], key=lambda x: x[0])[-1][1]
@@ -123,7 +135,7 @@ class GameEngine:
             bot.game_over(winner.name)
 
 
-class Bot:
+class BotMsger:
     def __init__(self, name, bot):
         self.name = name
         self.bot = bot
@@ -140,23 +152,38 @@ class Bot:
         self.deal_score = 0
 
     def new_deal(self):
+        self.bot.new_deal()
         self.cards = {}
         self.scored_cards = {}
         self.deal_score = 0
 
-    def deal_end(self):
+    def new_round(self):
+        self.bot.new_round()
+
+    def round_end(self, bots):
+        players = [{'playerName':bot.name,
+                    'scoreCards': [key for key in bot.scored_cards if bot.scored_cards[key]],
+                    'dealScore': bot.deal_score} for bot in bots]
+        self.bot.round_end(players)
+
+    def deal_end(self, bots):
         self.game_score += self.deal_score
+        players = [{'playerName': bot.name,
+                    'dealScore': bot.deal_score,
+                    'gameScore': bot.game_score, } for bot in bots]
+        self.bot.deal_end(players)
 
     def receive_cards(self, cards):
         cards.sort(key=lambda x: Game.Card(x).instanceIndex)
-        print(cards)
+        #print(cards)
         self.bot.receive_cards(cards)
         for card in cards:
             self.cards[card] = 1
 
-    def receive_opponent_cards(self, cards):
-        print(cards.sort(key=lambda x: Game.Card(x).instanceIndex))
-        self.bot.receive_opponent_cards(cards)
+    def receive_opponent_cards(self, sender_name, cards):
+        cards.sort(key=lambda x: Game.Card(x).instanceIndex)
+        print(cards)
+        self.bot.receive_opponent_cards(sender_name, cards)
         for card in cards:
             self.cards[card] = 1
 
@@ -176,15 +203,24 @@ class Bot:
     def expose_card_notify(self, name):
         self.bot.expose_cards_end(name)
 
-    def pick(self, game_engine):
-        pass
+    def pick(self):
+        card = self.bot.pick_card()
+        self.cards[card] = -1
+        return card
+
+    def played(self, name, card):
+        self.bot.turn_end(name, card)
+
+    def get_score_cards(self, cards):
+        for card in cards:
+            self.scored_cards[card] = 1
 
     def game_over(self, winner_name):
         pass
 
 
 if __name__ == '__main__':
-    import unittest.mock as mock
-    _bots = [Bot(str(i), mock.MagicMock()) for i in range(4)]
+    from alphaZeroBot import AlphaZeroBot
+    _bots = [BotMsger(str(i), AlphaZeroBot(str(i))) for i in range(4)]
     ge = GameEngine(_bots)
     ge.start_game()
