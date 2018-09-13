@@ -162,5 +162,8 @@ class Game:
             player.bot.deal_end(deepcopy(self.info), [deepcopy(player.info) for player in self.players])
 
     def game_end(self):
-        # TODO
-        pass
+        winner_name = sorted([(player.info[KEY_GAME_SCORE], player.info[KEY_PLAYER_NAME]) for player in self.players],
+                             key=lambda x: x[0])[-1][1]
+
+        for player in self.players:
+            player.bot.game_end(winner_name)
