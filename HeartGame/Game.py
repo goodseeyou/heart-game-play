@@ -2,6 +2,7 @@ from random import shuffle
 from copy import deepcopy
 from Player import *
 import Card
+import Action
 
 MAP_PASS_CARD_TARGET_DELTA = [1, 3, 2, 0]
 
@@ -118,8 +119,26 @@ class Game:
             for notify_payer in self.players:
                 self._turn_end(notify_payer)
 
+    def __round_first_player(self):
+        first_player = None
+        first_player_name = self.info[KEY_ROUND_PLAYERS][0]
+        for player in self.players:
+            if player.info[KEY_PLAYER_NAME] == first_player_name:
+                first_player = player
+                break
+        assert (first_player is not None)
+        return first_player
+
+    def __round_first_card(self, first_player):
+        if KEY_TURN_CARD not in first_player.info or not first_player.info[KEY_TURN_CARD]:
+            return None
+
+        return first_player.info[KEY_TURN_CARD]
+
     def _your_turn(self, player):
-        # TODO candidate cards
+        round_first_card = self.__round_first_card(self.__round_first_player())
+        candidate_cards = Action.pick_candidate_cards(round_first_card, player.info[KEY_CARDS])
+        player.info[KEY_CANDIDATE_CARDS] = candidate_cards
 
         turn_card = player.bot.your_turn(deepcopy(self.info), deepcopy(player.info))
         player.pick_cards([turn_card])
@@ -133,6 +152,7 @@ class Game:
         self._assign_score_cards()
         self.players[self.first_player_index].update_deal_score(self.does_exposed)
         for player in self.players:
+            del player.info[KEY_CANDIDATE_CARDS]
             player.bot.round_end(deepcopy(self.info), [deepcopy(player.info) for player in self.players])
 
     def _assign_score_cards(self):

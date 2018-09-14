@@ -49,7 +49,7 @@ class Bot:
     def _pass_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PASS, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[-10:]
+        print self.name, state_instance.instance[:]
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return self.self_info[KEY_CARDS][:3]
@@ -78,7 +78,7 @@ class Bot:
     def _expose_cards(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_EXPOSE, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[-10:]
+        print self.name, state_instance.instance[:]
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return [Card.CARD_AH]
@@ -99,7 +99,7 @@ class Bot:
     def _pick_turn_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PICK, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[-10:]
+        print self.name, state_instance.instance[:]
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return self.self_info[KEY_CARDS][0]

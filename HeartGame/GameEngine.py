@@ -3,6 +3,7 @@ from Bot import Bot
 from Player import Player
 from random import shuffle
 
+
 class GameEngine:
     def __init__(self, game):
         self.game = game
