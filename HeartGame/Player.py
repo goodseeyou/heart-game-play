@@ -1,4 +1,3 @@
-import mock
 import Card
 
 KEY_PLAYER_NAME = 'playerName'

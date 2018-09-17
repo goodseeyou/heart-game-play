@@ -49,7 +49,7 @@ class Bot:
     def _pass_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PASS, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[:]
+        print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return self.self_info[KEY_CARDS][:3]
@@ -78,7 +78,7 @@ class Bot:
     def _expose_cards(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_EXPOSE, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[:]
+        print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return [Card.CARD_AH]
@@ -99,7 +99,7 @@ class Bot:
     def _pick_turn_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PICK, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[:]
+        print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return self.self_info[KEY_CARDS][0]
@@ -132,7 +132,7 @@ class Bot:
     def game_end(self, winner_name):
         self.is_winner = self.name == winner_name
         state_instance = StateInstance(self.name, KEY_ACTION_GAME_OVER, self.game_info, self.players_info, self.is_winner)
-        print self.name, state_instance.instance[-10:]
+        print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
 
@@ -171,7 +171,11 @@ class StateInstance:
     @property
     def instance(self):
         if self._instance is None:
-            self._instance = self.step_instance + reduce(lambda x, y: x + y, self.players_instance)
+            #self._instance = self.step_instance + reduce(lambda x, y: x + y, self.players_instance)
+            _tmp = []
+            for player_instance in self.players_instance:
+                _tmp += player_instance
+            self._instance = self.step_instance + _tmp
         return self._instance
 
     def sort_players(self):

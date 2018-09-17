@@ -10,7 +10,7 @@ CARD_TC = 'TC'
 
 H_SCORE_CARDS_MAP = {'2H':-1, '3H':-1, '4H':-1, '5H':-1, '6H':-1, '7H':-1, '8H':-1, '9H':-1, 'TH':-1, 'JH':-1, 'QH':-1, 'KH':-1, 'AH':-1, }
 Q_SCORE_CARDS_MAP = {'QS':-13}
-ALL_SCORE_CARDS_LIST = H_SCORE_CARDS_MAP.keys() + Q_SCORE_CARDS_MAP.keys() + [CARD_TC, ]
+ALL_SCORE_CARDS_LIST = list(H_SCORE_CARDS_MAP.keys()) + list(Q_SCORE_CARDS_MAP.keys()) + [CARD_TC, ]
 
 
 class Card:
