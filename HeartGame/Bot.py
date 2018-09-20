@@ -33,6 +33,7 @@ class Bot:
                 break
 
     def new_deal(self, players_info):
+        self.is_winner = None
         self.players_info = players_info
         for info in players_info:
             if info[KEY_PLAYER_NAME] == self.name:
@@ -40,98 +41,118 @@ class Bot:
                 break
 
     def pass_card(self, game_info, self_info):
-        self.game_info = game_info
-        for key in self_info:
-            self.self_info[key] = self_info[key]
+        self.game_info.update(game_info)
+        self.self_info.update(self_info)
 
-        return self._pass_card()
+        return self._pass_card(game_info[KEY_RECEIVER])
 
-    def _pass_card(self):
+    def _pass_card(self, receiver_name):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PASS, self.game_info, self.players_info, self.is_winner)
-        print(self.name, state_instance.instance[:])
+        #print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
-        return self.self_info[KEY_CARDS][:3]
 
-    def receive_opponent_cards(self, sender_info, self_info):
-        for i in range(4):
-            player = self.players_info[i]
-            if player[KEY_PLAYER_NAME] == sender_info[KEY_PLAYER_NAME]:
-                self.players_info[i] = sender_info
+        pass_cards = self.self_info[KEY_CARDS][:3]
+
+        Bot.record_picked_cards(self.self_info, pass_cards)
+        for player in self.players_info:
+            if player[KEY_PLAYER_NAME] == receiver_name:
+                player[KEY_CARDS] = player.get(KEY_CARDS, []) + pass_cards
                 break
 
-        for key in self_info:
-            self.self_info[key] = self_info[key]
+        return pass_cards
+
+    def receive_opponent_cards(self, self_info):
+        self.self_info.update(self_info)
+        received_cards = self.self_info[KEY_RECEIVED_CARDS]
+
+        sender_name = self.self_info[KEY_RECEIVED_FROM]
+        for player in self.players_info:
+            if player[KEY_PLAYER_NAME] == sender_name:
+                Bot.record_picked_cards(player, received_cards)
 
     def pass_end(self, game_info, players_info, self_info):
-        self.game_info = game_info
-        self.players_info = players_info
-        for key in self_info:
-            self.self_info[key] = self_info[key]
+        self.game_info.update(game_info)
+        self._update_players_info(players_info)
+        self.self_info.update(self_info)
+
+    def _update_players_info(self, players_info):
+        for player in self.players_info:
+            name = player[KEY_PLAYER_NAME]
+            to_update = [_player for _player in players_info if _player[KEY_PLAYER_NAME] == name][0]
+            player.update(to_update)
 
     def expose_cards(self, self_info):
-        for key in self_info:
-            self.self_info[key] = self_info[key]
+        self.self_info.update(self_info)
         return self._expose_cards()
 
     def _expose_cards(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_EXPOSE, self.game_info, self.players_info, self.is_winner)
-        print(self.name, state_instance.instance[:])
+        #print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return [Card.CARD_AH]
 
     def expose_cards_end(self, players_info):
-        self.players_info = players_info
+        self._update_players_info(players_info)
         for info in players_info:
             if info[KEY_PLAYER_NAME] == self.name:
-                self.self_info = info
+                self.self_info.update(info)
+                break
 
     def your_turn(self, game_info, self_info):
-        self.game_info = game_info
-        for key in self_info:
-            self.self_info[key] = self_info[key]
+        self.game_info.update(game_info)
+        self.self_info.update(self_info)
 
         return self._pick_turn_card()
 
     def _pick_turn_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PICK, self.game_info, self.players_info, self.is_winner)
-        print(self.name, state_instance.instance[:])
+        #print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return self.self_info[KEY_CARDS][0]
 
-    def turn_end(self, game_info, player_info):
-        self.game_info = game_info
-
+    def turn_end(self, game_info):
+        self.game_info.update(game_info)
+        turn_player_name = game_info[KEY_TURN_PLAYER]
         for player in self.players_info:
-            if player[KEY_PLAYER_NAME] == player_info[KEY_PLAYER_NAME]:
-                for key in player_info:
-                    player[key] = player_info[key]
-                break
+            if player[KEY_PLAYER_NAME] == turn_player_name:
+                Bot.record_picked_cards(player, [game_info[KEY_TURN_CARD]])
+
+    @classmethod
+    def record_picked_cards(cls, player, cards):
+        if KEY_PICKED_CARDS not in player:
+            player[KEY_PICKED_CARDS] = []
+
+        for card in cards:
+            if card not in player[KEY_PICKED_CARDS]:
+                player[KEY_PICKED_CARDS].append(card)
 
     def round_end(self, game_info, players_info):
-        self.game_info = game_info
-        self.players_info = players_info
+        del self.game_info[KEY_ROUND_PLAYERS]
+        self.game_info.update(game_info)
+        self._update_players_info(players_info)
         for player in self.players_info:
             if player[KEY_PLAYER_NAME] == self.name:
                 self.self_info = player
                 break
 
     def deal_end(self, game_info, players_info):
-        self.game_info = game_info
-        self.players_info = players_info
+        self.game_info.update(game_info)
+        self._update_players_info(players_info)
         for player in self.players_info:
             if player[KEY_PLAYER_NAME] == self.name:
                 self.self_info = player
                 break
 
-    def game_end(self, winner_name):
+    def deal_winner(self, winner_name):
         self.is_winner = self.name == winner_name
-        state_instance = StateInstance(self.name, KEY_ACTION_GAME_OVER, self.game_info, self.players_info, self.is_winner)
+        state_instance = StateInstance(self.name, KEY_ACTION_GAME_OVER,
+                                       self.game_info, self.players_info, self.is_winner)
         print(self.name, state_instance.instance[:])
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
@@ -194,10 +215,11 @@ class StateInstance:
             does_expose = 1 if player[KEY_EXPOSED_CARDS] else 0
             shooting_moon = 1 if player[KEY_SHOOTING_THE_MOON] else 0
             scored_cards_instance = get_cards_array([Card.Card(card_string) for card_string in player[KEY_SCORE_CARDS]])
-            hand_cards_instance = get_cards_array([Card.Card(card_string) for card_string in player[KEY_CARDS]])
-            for card_string in player[KEY_RECEIVED_CARDS]:
+            hand_cards_instance = get_cards_array(
+                [Card.Card(card_string) for card_string in player.get(KEY_CARDS, tuple())])
+            for card_string in player.get(KEY_RECEIVED_CARDS, tuple()):
                 hand_cards_instance[Card.Card(card_string).instanceIndex] = VAL_HAVE_CARD
-            for card_string in player[KEY_PICKED_CARDS]:
+            for card_string in player.get(KEY_PICKED_CARDS, tuple()):
                 hand_cards_instance[Card.Card(card_string).instanceIndex] = VAL_PICKED
 
             player_instance = [does_expose, shooting_moon] + scored_cards_instance + hand_cards_instance

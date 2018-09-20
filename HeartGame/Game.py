@@ -12,6 +12,9 @@ KEY_GAME_NUMBER = 'gameNumber'
 KEY_ROUND_PLAYERS = 'roundPlayers'
 KEY_TURN_PLAYER = 'turnPlayer'
 KEY_TURN_CARD = 'turnCard'
+KEY_RECEIVER = 'receiver'
+
+PRIVATE_INFO_KEYS = (KEY_CARDS, KEY_PICKED_CARDS, KEY_RECEIVED_CARDS, )
 
 
 class Game:
@@ -33,7 +36,9 @@ class Game:
     def new_game(self):
         self.info[KEY_GAME_NUMBER] += 1
         for player in self.players:
-            player.bot.new_game(deepcopy(self.info), [deepcopy(player.info) for player in self.players])
+            player.reset_game()
+            player.bot.new_game(deepcopy(self.info),
+                                Game.remove_private_players_info(player.info[KEY_PLAYER_NAME], self.players))
 
     # deal cards to players
     # update deal score and game score
@@ -48,11 +53,13 @@ class Game:
             player_cards = sorted(cards[i * 13:i * 13 + 13])
 
             self.players[i].reset_deal()
+            self.players[i].info[KEY_DEAL_SCORE] = 0
             player_info = self.players[i].info
             player_info[KEY_CARDS] = player_cards
             player_info[KEY_CARDS_COUNT] = len(player_info[KEY_CARDS])
 
-            self.players[i].bot.new_deal([deepcopy(player.info) for player in self.players])
+            self.players[i].bot.new_deal(Game.remove_private_players_info(self.players[i].info[KEY_PLAYER_NAME],
+                                                                          self.players))
 
     # step of passing card
     def pass_card(self):
@@ -67,18 +74,25 @@ class Game:
         for i in range(4):
             sender = self.players[i]
             receiver = self.players[(i+delta) % 4]
-            pass_cards = sender.bot.pass_card(deepcopy(self.info), deepcopy(sender.info))
+            game_info = deepcopy(self.info)
+            game_info.update({KEY_RECEIVER: receiver.info[KEY_PLAYER_NAME]})
+            pass_cards = sender.bot.pass_card(game_info,
+                                              deepcopy(sender.info))
             tmp_records.append((sender, pass_cards, receiver,))
 
         for sender, pass_cards, receiver in tmp_records:
             sender.remove_cards(pass_cards)
             receiver.add_cards(pass_cards)
-            receiver.bot.receive_opponent_cards(deepcopy(sender.info), deepcopy(receiver.info))
+            receiver_info = deepcopy(receiver.info)
+            receiver_info.update({
+                KEY_RECEIVED_FROM: sender.info[KEY_PLAYER_NAME],
+                KEY_RECEIVED_CARDS: pass_cards[:], })
+            receiver.bot.receive_opponent_cards(receiver_info)
 
     def pass_end(self):
         for player in self.players:
             player.bot.pass_end(deepcopy(self.info),
-                                [deepcopy(player.info) for player in self.players],
+                                Game.remove_private_players_info(player.info[KEY_PLAYER_NAME], self.players),
                                 deepcopy(player.info))
 
     def expose_cards(self):
@@ -94,7 +108,7 @@ class Game:
 
     def expose_cards_end(self):
         for player in self.players:
-            player.bot.expose_cards_end([deepcopy(player.info) for player in self.players])
+            player.bot.expose_cards_end(Game.remove_private_players_info(player.info[KEY_PLAYER_NAME], self.players))
 
     def new_round(self):
         self.info[KEY_ROUND_NUMBER] += 1
@@ -145,7 +159,7 @@ class Game:
         return turn_card
 
     def _turn_end(self, player):
-        player.bot.turn_end(deepcopy(self.info), deepcopy(player.info))
+        player.bot.turn_end(deepcopy(self.info))
 
     # calculate score card and notify
     def round_end(self):
@@ -153,7 +167,8 @@ class Game:
         self.players[self.first_player_index].update_deal_score(self.does_exposed)
         for player in self.players:
             del player.info[KEY_CANDIDATE_CARDS]
-            player.bot.round_end(deepcopy(self.info), [deepcopy(player.info) for player in self.players])
+            player.bot.round_end(deepcopy(self.info),
+                                 Game.remove_private_players_info(player.info[KEY_PLAYER_NAME], self.players))
 
     def _assign_score_cards(self):
         cards = []
@@ -176,14 +191,43 @@ class Game:
         for player in self.players:
             player_info = player.info
             player_info[KEY_GAME_SCORE] += player_info[KEY_DEAL_SCORE]
-            player_info[KEY_DEAL_SCORE] = 0
 
         for player in self.players:
-            player.bot.deal_end(deepcopy(self.info), [deepcopy(player.info) for player in self.players])
+            player.bot.deal_end(deepcopy(self.info),
+                                Game.remove_private_players_info(player.info[KEY_PLAYER_NAME], self.players))
+
+    def deal_winner(self):
+        sorted_player_score_name = \
+            sorted([(player.info[KEY_DEAL_SCORE], player.info[KEY_PLAYER_NAME]) for player in self.players],
+                   key=lambda x: x[0],
+                   reverse=True)
+
+        _max_score = max([player.info[KEY_DEAL_SCORE] for player in self.players])
+        winner_names = []
+        for score, name in sorted_player_score_name:
+            if _max_score == score:
+                winner_names.append(name)
+
+        for player in self.players:
+            if player.info[KEY_PLAYER_NAME] in winner_names:
+                winner_name = player.info[KEY_PLAYER_NAME]
+            else:
+                winner_name = str(winner_names)
+            player.bot.deal_winner(winner_name)
 
     def game_end(self):
-        winner_name = sorted([(player.info[KEY_GAME_SCORE], player.info[KEY_PLAYER_NAME]) for player in self.players],
-                             key=lambda x: x[0])[-1][1]
+        pass
 
-        for player in self.players:
-            player.bot.game_end(winner_name)
+    @classmethod
+    def remove_private_players_info(cls, self_name, players_input):
+        copied_players = [deepcopy(player.info) for player in players_input]
+
+        for player in copied_players:
+            if player[KEY_PLAYER_NAME] == self_name:
+                continue
+
+            for key in PRIVATE_INFO_KEYS:
+                if key in player:
+                    del player[key]
+
+        return copied_players

@@ -2,6 +2,7 @@ import Card
 
 KEY_PLAYER_NAME = 'playerName'
 KEY_PLAYER_NUMBER = 'playerNumber'
+KEY_MATCH_SCORE = 'matchScore'
 KEY_GAME_SCORE = 'gameScore'
 KEY_DEAL_SCORE = 'dealScore'
 KEY_SCORE_CARDS = 'scoreCards'
@@ -21,6 +22,7 @@ class Player:
         self.info = {
             KEY_PLAYER_NAME: player_name,
             KEY_PLAYER_NUMBER: player_number,
+            KEY_MATCH_SCORE: 0,
             KEY_GAME_SCORE: 0,
             KEY_DEAL_SCORE: 0,
             KEY_SCORE_CARDS: [],
@@ -36,6 +38,10 @@ class Player:
         }
         self.bot = bot
 
+    def reset_game(self):
+        self.info[KEY_GAME_SCORE] = 0
+        self.reset_deal()
+
     def reset_deal(self):
         self.info[KEY_SCORE_CARDS] = []
         self.info[KEY_CARDS] = []
@@ -47,6 +53,7 @@ class Player:
         self.info[KEY_EXPOSED_CARDS] = []
         self.info[KEY_SHOOTING_THE_MOON] = False
         self.info[KEY_ROUND_CARD] = ''
+        self.info[KEY_DEAL_SCORE] = 0
 
     def pick_cards(self, cards):
         self.info[KEY_PICKED_CARDS] += cards

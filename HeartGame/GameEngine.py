@@ -29,6 +29,9 @@ class GameEngine:
             #print('\n'.join([str(game.players[i].info['scoreCards']) for i in range(4)]))
             #print(sum([game.players[i].info['dealScore'] for i in range(4)]))
             self.game.deal_end()
+            print(','.join(
+                [str((game.players[i].info['dealScore'], game.players[i].info['playerName'],)) for i in range(4)]))
+            self.game.deal_winner()
         self.game.game_end()
 
 
