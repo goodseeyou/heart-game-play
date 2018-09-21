@@ -117,8 +117,8 @@ class MCTS():
 
         a = best_act
         next_s, next_player = self.game.getNextState(canonicalBoard, 1, a)
-        # TODO give 3 players' state when training
         # TODO simulate valid remain 3 players' state by current state while in real game
+        # TODO simulate next player's state, chose simulated state which has best v.
         next_s = self.game.getCanonicalForm(next_s, next_player)
 
         v = self.search(next_s)
