@@ -6,6 +6,9 @@ from copy import deepcopy
 EMPTY_CARDS_INSTANCE = [0] * 52
 EMPTY_ACTION_INSTANCE = [0] * 4
 EMPTY_DEAL_NUMBER_INSTANCE = [0] * 4
+LEN_EMPTY_DEAL_NUMBER_INSTANCE = len(EMPTY_DEAL_NUMBER_INSTANCE)
+LEN_EMPTY_ACTION_INSTANCE = len(EMPTY_ACTION_INSTANCE)
+LEN_EMPTY_CARDS_INSTANCE = len(EMPTY_CARDS_INSTANCE)
 VAL_PICKED = -1
 VAL_NO_OR_UNKNOWN_CARD = 0
 VAL_HAVE_CARD = 1
@@ -40,20 +43,20 @@ class Bot:
                 self.self_info = info
                 break
 
-    def pass_card(self, game_info, self_info):
+    def pass_cards(self, game_info, self_info):
         self.game_info.update(game_info)
         self.self_info.update(self_info)
 
-        return self._pass_card(game_info[KEY_RECEIVER])
+        return self._pass_cards(game_info[KEY_RECEIVER])
 
-    def _pass_card(self, receiver_name):
+    def _pass_cards(self, receiver_name):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PASS, self.game_info, self.players_info, self.is_winner)
-        #print(self.name, state_instance.instance[:])
+        print(self.name, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
 
-        pass_cards = self.self_info[KEY_CARDS][:3]
+        pass_cards = self.self_info[KEY_CANDIDATE_CARDS][:3]
 
         Bot.record_picked_cards(self.self_info, pass_cards)
         for player in self.players_info:
@@ -90,7 +93,7 @@ class Bot:
     def _expose_cards(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_EXPOSE, self.game_info, self.players_info, self.is_winner)
-        #print(self.name, state_instance.instance[:])
+        print(self.name, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return [Card.CARD_AH]
@@ -102,6 +105,12 @@ class Bot:
                 self.self_info.update(info)
                 break
 
+    def new_round(self, game_info):
+        self.game_info.update(game_info)
+
+        for player in self.players_info:
+            del player[KEY_ROUND_CARD]
+
     def your_turn(self, game_info, self_info):
         self.game_info.update(game_info)
         self.self_info.update(self_info)
@@ -111,17 +120,26 @@ class Bot:
     def _pick_turn_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PICK, self.game_info, self.players_info, self.is_winner)
-        #print(self.name, state_instance.instance[:])
+        print(self.name, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
-        return self.self_info[KEY_CARDS][0]
+        return self.self_info[KEY_CANDIDATE_CARDS][0]
 
-    def turn_end(self, game_info):
+    def turn_end(self, game_info, players_info):
         self.game_info.update(game_info)
+
         turn_player_name = game_info[KEY_TURN_PLAYER]
+        turn_player_info = None
+        for player in players_info:
+            if player[KEY_PLAYER_NAME] == turn_player_name:
+                turn_player_info = player
+                break
+        assert(turn_player_info is not None)
+
         for player in self.players_info:
             if player[KEY_PLAYER_NAME] == turn_player_name:
-                Bot.record_picked_cards(player, [game_info[KEY_TURN_CARD]])
+                player.update(turn_player_info)
+                Bot.record_picked_cards(player, [player[KEY_ROUND_CARD]])
 
     @classmethod
     def record_picked_cards(cls, player, cards):
@@ -153,7 +171,7 @@ class Bot:
         self.is_winner = self.name == winner_name
         state_instance = StateInstance(self.name, KEY_ACTION_GAME_OVER,
                                        self.game_info, self.players_info, self.is_winner)
-        print(self.name, state_instance.instance[:])
+        print(self.name, state_instance.is_winner, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
 
@@ -176,6 +194,10 @@ class StateInstance:
         self.players_info = deepcopy(players_info)
         self.sort_players()
         self.is_winner = is_winner
+
+    def set_is_winner(self, is_winner):
+        self.is_winner = is_winner
+        return self
 
     @property
     def players_instance(self):
@@ -211,8 +233,9 @@ class StateInstance:
 
     def _gen_players_instance(self):
         players_instance = []
-        for player in self.players_info:
-            does_expose = 1 if player[KEY_EXPOSED_CARDS] else 0
+        for i in range(4):
+            player = self.players_info[i]
+            does_expose = 1 if player.get(KEY_EXPOSED_CARDS, False) else 0
             shooting_moon = 1 if player[KEY_SHOOTING_THE_MOON] else 0
             scored_cards_instance = get_cards_array([Card.Card(card_string) for card_string in player[KEY_SCORE_CARDS]])
             hand_cards_instance = get_cards_array(
@@ -232,15 +255,60 @@ class StateInstance:
         action_instance = StateInstance.action_instance(self.action)
         round_first_card_instance = self.__get_round_first_card_instance()
 
-        if self.is_winner is None:
-            is_winner_instance = 0
-        else:
-            is_winner_instance = 1 if self.is_winner else 0
+        return deal_number_instance + action_instance + round_first_card_instance
 
-        return [is_winner_instance] + deal_number_instance + action_instance + round_first_card_instance
+    @classmethod
+    def from_instance(cls, instance,
+                      len_step_instance=LEN_EMPTY_DEAL_NUMBER_INSTANCE + LEN_EMPTY_ACTION_INSTANCE + LEN_EMPTY_CARDS_INSTANCE,
+                      len_player_instance=106):
+        step_instance = instance[:len_step_instance]
+
+        deal_number_instance = step_instance[:LEN_EMPTY_DEAL_NUMBER_INSTANCE]
+        deal_number = deal_number_instance.index(1) + 1
+        action_instance = step_instance[LEN_EMPTY_DEAL_NUMBER_INSTANCE :
+                                        LEN_EMPTY_DEAL_NUMBER_INSTANCE + LEN_EMPTY_ACTION_INSTANCE]
+        action = ACTION_LIST[action_instance.index(1)]
+
+        first_card_instance = step_instance[LEN_EMPTY_DEAL_NUMBER_INSTANCE + LEN_EMPTY_ACTION_INSTANCE:
+                                            LEN_EMPTY_DEAL_NUMBER_INSTANCE + LEN_EMPTY_ACTION_INSTANCE +
+                                            LEN_EMPTY_CARDS_INSTANCE]
+        first_cards = [Card.Card.cardStringFromInstanceIndex(i) for i in range(LEN_EMPTY_CARDS_INSTANCE)
+                       if first_card_instance[i] != 0]
+        assert(len(first_cards) <= 1)
+        game_info = {KEY_DEAL_NUMBER: deal_number,
+                     'event_name': action,
+                     'first_card': first_cards}
+
+        players_info = []
+        for player_index in range(4):
+            player_instance = instance[len_step_instance + player_index * len_player_instance:
+                                       len_step_instance + (player_index+1) * len_player_instance]
+            does_expose = player_instance[0] == 1
+            shooting_moon = player_instance[1] == 1
+            scored_cards_instance = player_instance[2:54]
+            scored_cards = [Card.Card.cardStringFromInstanceIndex(i) for i in range(LEN_EMPTY_CARDS_INSTANCE)
+                            if scored_cards_instance[i] == 1]
+            hand_cards_instance = player_instance[54:106]
+            hand_cards = [Card.Card.cardStringFromInstanceIndex(i) for i in range(LEN_EMPTY_CARDS_INSTANCE)
+                          if hand_cards_instance[i] == 1]
+            picked_cards = [Card.Card.cardStringFromInstanceIndex(i) for i in range(LEN_EMPTY_CARDS_INSTANCE)
+                            if hand_cards_instance[i] == -1]
+            player_info = {
+                'index': player_index,
+                'exposed': does_expose,
+                'shooting_moon': shooting_moon,
+                KEY_CARDS: hand_cards,
+                KEY_SCORE_CARDS: scored_cards,
+                KEY_PICKED_CARDS: picked_cards,
+            }
+            players_info.append(player_info)
+
+        return game_info, players_info
 
     def __get_round_first_card_instance(self):
-        if KEY_ROUND_PLAYERS not in self.game_info or not self.game_info[KEY_ROUND_PLAYERS]:
+        if KEY_ROUND_PLAYERS not in self.game_info \
+                or not self.game_info[KEY_ROUND_PLAYERS]\
+                or self.game_info[KEY_ROUND_PLAYERS][0] == self.name:
             return get_cards_array()
 
         first_player = None
@@ -251,12 +319,12 @@ class StateInstance:
                 break
         assert (first_player is not None)
 
-        if KEY_TURN_CARD not in first_player:
+        if KEY_ROUND_CARD not in first_player or not first_player[KEY_ROUND_CARD]:
             return get_cards_array()
 
-        round_first_card_string = first_player[KEY_TURN_CARD]
+        round_first_card_string = first_player[KEY_ROUND_CARD]
         round_first_card = Card.Card(round_first_card_string)
-        round_first_card_instance = get_cards_array(round_first_card)
+        round_first_card_instance = get_cards_array((round_first_card, ))
 
         return round_first_card_instance
 

@@ -11,7 +11,7 @@ KEY_DEAL_NUMBER = 'dealNumber'
 KEY_GAME_NUMBER = 'gameNumber'
 KEY_ROUND_PLAYERS = 'roundPlayers'
 KEY_TURN_PLAYER = 'turnPlayer'
-KEY_TURN_CARD = 'turnCard'
+KEY_ROUND_CARD = 'roundCard'
 KEY_RECEIVER = 'receiver'
 
 PRIVATE_INFO_KEYS = (KEY_CARDS, KEY_PICKED_CARDS, KEY_RECEIVED_CARDS, )
@@ -26,7 +26,7 @@ class Game:
             KEY_GAME_NUMBER: 0,
             KEY_ROUND_PLAYERS: [],
             KEY_TURN_PLAYER: '',
-            KEY_TURN_CARD: '',
+            KEY_ROUND_CARD: '',
         }
         self.first_player_index = None
         self.round_card_records = []
@@ -62,7 +62,7 @@ class Game:
                                                                           self.players))
 
     # step of passing card
-    def pass_card(self):
+    def pass_cards(self):
         """
         including asking player to pass cards, and notify player with received cards
         """
@@ -76,8 +76,8 @@ class Game:
             receiver = self.players[(i+delta) % 4]
             game_info = deepcopy(self.info)
             game_info.update({KEY_RECEIVER: receiver.info[KEY_PLAYER_NAME]})
-            pass_cards = sender.bot.pass_card(game_info,
-                                              deepcopy(sender.info))
+            pass_cards = sender.bot.pass_cards(game_info,
+                                               deepcopy(sender.info))
             tmp_records.append((sender, pass_cards, receiver,))
 
         for sender, pass_cards, receiver in tmp_records:
@@ -122,13 +122,16 @@ class Game:
         self.info[KEY_ROUND_PLAYERS] = \
             [self.players[(i+self.first_player_index) % 4].info[KEY_PLAYER_NAME] for i in range(4)]
 
+        for player in self.players:
+            player.bot.new_round(deepcopy(self.info))
+
         for i in range(4):
             turn_player = self.players[(i+self.first_player_index) % 4]
             self.info[KEY_TURN_PLAYER] = turn_player.info[KEY_PLAYER_NAME]
 
-            turn_card = self._your_turn(turn_player)
-            self.info[KEY_TURN_CARD] = turn_card
-            self.round_card_records.append((turn_player, turn_card, ))
+            round_card = self._your_turn(turn_player)
+            turn_player.info[KEY_ROUND_CARD] = round_card
+            self.round_card_records.append((turn_player, round_card, ))
 
             for notify_payer in self.players:
                 self._turn_end(notify_payer)
@@ -144,22 +147,23 @@ class Game:
         return first_player
 
     def __round_first_card(self, first_player):
-        if KEY_TURN_CARD not in first_player.info or not first_player.info[KEY_TURN_CARD]:
+        if KEY_ROUND_CARD not in first_player.info or not first_player.info[KEY_ROUND_CARD]:
             return None
 
-        return first_player.info[KEY_TURN_CARD]
+        return first_player.info[KEY_ROUND_CARD]
 
     def _your_turn(self, player):
         round_first_card = self.__round_first_card(self.__round_first_player())
         candidate_cards = Action.pick_candidate_cards(round_first_card, player.info[KEY_CARDS])
         player.info[KEY_CANDIDATE_CARDS] = candidate_cards
 
-        turn_card = player.bot.your_turn(deepcopy(self.info), deepcopy(player.info))
-        player.pick_cards([turn_card])
-        return turn_card
+        round_card = player.bot.your_turn(deepcopy(self.info), deepcopy(player.info))
+        player.pick_cards([round_card])
+        return round_card
 
     def _turn_end(self, player):
-        player.bot.turn_end(deepcopy(self.info))
+        player.bot.turn_end(deepcopy(self.info),
+                            Game.remove_private_players_info(player.info[KEY_PLAYER_NAME], self.players))
 
     # calculate score card and notify
     def round_end(self):

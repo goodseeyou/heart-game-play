@@ -22,12 +22,20 @@ def is_valid_pick(first_card, hand_cards, pick_card):
     if pick_card not in hand_cards:
         return False
     if not first_card:
-        return pick_card == CARD_2C
+        if CARD_2C in hand_cards:
+            return pick_card == CARD_2C
+        else:
+            return True
 
     first_suit = Card(first_card).suit
     have_first_suit = any([first_suit == Card(card).suit for card in hand_cards])
     if have_first_suit:
         return first_suit == Card(pick_card).suit
+    elif first_card == CARD_2C:
+        if all([card in ALL_SCORE_CARDS_LIST for card in hand_cards]):
+            return pick_card in H_SCORE_CARDS_MAP
+        else:
+            return pick_card not in ALL_SCORE_CARDS_LIST
 
     return True
 

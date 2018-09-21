@@ -16,7 +16,7 @@ class GameEngine:
         for _ in range(4):
             self.game.new_deal()
             print('deal number: %s' % self.game.info['dealNumber'])
-            self.game.pass_card()
+            self.game.pass_cards()
             self.game.pass_end()
             self.game.expose_cards()
             self.game.expose_cards_end()
