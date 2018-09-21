@@ -57,7 +57,7 @@ class Bot:
     def _pass_cards(self, receiver_name):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PASS, self.game_info, self.players_info, self.is_winner)
-        print(self.name, StateInstance.from_instance(state_instance.instance[:]))
+        #print(self.name, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
 
@@ -101,7 +101,7 @@ class Bot:
     def _expose_cards(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_EXPOSE, self.game_info, self.players_info, self.is_winner)
-        print(self.name, StateInstance.from_instance(state_instance.instance[:]))
+        #print(self.name, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return [Card.CARD_AH]
@@ -128,7 +128,7 @@ class Bot:
     def _pick_turn_card(self):
         # TODO
         state_instance = StateInstance(self.name, KEY_ACTION_PICK, self.game_info, self.players_info, self.is_winner)
-        print(self.name, StateInstance.from_instance(state_instance.instance[:]))
+        #print(self.name, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
         return self.self_info[KEY_CANDIDATE_CARDS][0]
@@ -179,7 +179,7 @@ class Bot:
         self.is_winner = self.name == winner_name
         state_instance = StateInstance(self.name, KEY_ACTION_GAME_OVER,
                                        self.game_info, self.players_info, self.is_winner)
-        print(self.name, state_instance.is_winner, StateInstance.from_instance(state_instance.instance[:]))
+        #print(self.name, state_instance.is_winner, StateInstance.from_instance(state_instance.instance[:]))
         self.gameInstance.add_state(state_instance)
         #print self.gameInstance.instance[-10:]
 

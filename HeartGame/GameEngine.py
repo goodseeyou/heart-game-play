@@ -15,7 +15,7 @@ class GameEngine:
         self.game.new_game()
         for _ in range(4):
             self.game.new_deal()
-            print('deal number: %s' % self.game.info['dealNumber'])
+            #print('deal number: %s' % self.game.info['dealNumber'])
             self.game.pass_cards()
             self.game.pass_end()
             self.game.expose_cards()
@@ -29,8 +29,7 @@ class GameEngine:
             #print('\n'.join([str(game.players[i].info['scoreCards']) for i in range(4)]))
             #print(sum([game.players[i].info['dealScore'] for i in range(4)]))
             self.game.deal_end()
-            print(','.join(
-                [str((game.players[i].info['dealScore'], game.players[i].info['playerName'],)) for i in range(4)]))
+            #print(','.join([str((game.players[i].info['dealScore'], game.players[i].info['playerName'],)) for i in range(4)]))
             self.game.deal_winner()
         self.game.game_end()
 
