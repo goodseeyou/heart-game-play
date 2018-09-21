@@ -47,7 +47,12 @@ class Bot:
         self.game_info.update(game_info)
         self.self_info.update(self_info)
 
-        return self._pass_cards(game_info[KEY_RECEIVER])
+        pass_cards = self._pass_cards(game_info[KEY_RECEIVER])
+        for player in self.players_info:
+            if player[KEY_PLAYER_NAME] == game_info[KEY_RECEIVER]:
+                player[KEY_CARDS] = player.get(KEY_CARDS, []) + pass_cards
+
+        return pass_cards
 
     def _pass_cards(self, receiver_name):
         # TODO
@@ -84,7 +89,10 @@ class Bot:
         for player in self.players_info:
             name = player[KEY_PLAYER_NAME]
             to_update = [_player for _player in players_info if _player[KEY_PLAYER_NAME] == name][0]
-            player.update(to_update)
+            for key in to_update:
+                if key in PRIVATE_INFO_KEYS:
+                    continue
+                player[key] = to_update[key]
 
     def expose_cards(self, self_info):
         self.self_info.update(self_info)
