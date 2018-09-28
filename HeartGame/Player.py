@@ -82,6 +82,7 @@ class Player:
         self.info[KEY_SCORE_CARDS] += [card for card in cards if card in Card.ALL_SCORE_CARDS_LIST]
 
     def update_deal_score(self, does_exposed):
+        '''
         multiple_AH = 2 if does_exposed else 1
         multiple_TC = 2 if Card.CARD_TC in self.info[KEY_SCORE_CARDS] else 1
         self.info[KEY_DEAL_SCORE] = \
@@ -90,3 +91,20 @@ class Player:
         if all([card in self.info[KEY_SCORE_CARDS] for card in Card.ALL_SCORE_CARDS_LIST]):
             self.info[KEY_DEAL_SCORE] = abs(self.info[KEY_DEAL_SCORE]) * 4
             self.info[KEY_SHOOTING_THE_MOON] = True
+        #'''
+        self.info[KEY_DEAL_SCORE], self.info[KEY_SHOOTING_THE_MOON] = \
+            calculate_deal_score(self.info[KEY_SCORE_CARDS], does_exposed)
+
+
+def calculate_deal_score(scored_cards, does_exposed):
+    shoot_moon = False
+    multiple_AH = 2 if does_exposed else 1
+    multiple_TC = 2 if Card.CARD_TC in scored_cards else 1
+    deal_score = \
+        sum([Card.Q_SCORE_CARDS_MAP.get(card, 0) * multiple_TC for card in scored_cards]) + \
+        sum([Card.H_SCORE_CARDS_MAP.get(card, 0) * multiple_AH * multiple_TC for card in scored_cards])
+    if all([card in scored_cards for card in Card.ALL_SCORE_CARDS_LIST]):
+        deal_score = abs(deal_score) * 4
+        shoot_moon = True
+
+    return deal_score, shoot_moon

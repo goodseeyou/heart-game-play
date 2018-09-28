@@ -17,6 +17,26 @@ LEN_ACTION_CANDIDATE = len(ACTION_CANDIDATE)
 ACTION_INSTANCE = [0] * LEN_ACTION_CANDIDATE
 FALSE_ACTION_INSTANCE = [0] * LEN_ACTION_CANDIDATE
 
+KEY_ACTION_PASS = 'pass'
+KEY_ACTION_EXPOSE = 'expose'
+KEY_ACTION_PICK = 'pick'
+KEY_ACTION_GAME_OVER = 'game_over'
+ACTION_LIST = [KEY_ACTION_PASS, KEY_ACTION_EXPOSE, KEY_ACTION_PICK, KEY_ACTION_GAME_OVER, ]
+
+
+def action_name(index):
+    if index < 0:
+        raise ValueError('index should >= 0')
+
+    if index < LEN_EXPOSE_CARD_CANDIDATE:
+        return KEY_ACTION_EXPOSE
+    elif LEN_EXPOSE_CARD_CANDIDATE < index < LEN_EXPOSE_CARD_CANDIDATE + LEN_PICK_CARD_CANDIDATE:
+        return KEY_ACTION_PICK
+    elif LEN_EXPOSE_CARD_CANDIDATE + LEN_PICK_CARD_CANDIDATE < index < LEN_ACTION_CANDIDATE:
+        return KEY_ACTION_PASS
+
+    raise ValueError('index should less len %s' % LEN_ACTION_CANDIDATE)
+
 
 def is_valid_pick(first_card, hand_cards, pick_card):
     if pick_card not in hand_cards:

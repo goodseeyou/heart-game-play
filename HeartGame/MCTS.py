@@ -3,19 +3,20 @@ Modify from https://github.com/suragnair/alpha-zero-general
 """
 import math
 import numpy as np
+import Action
 
 EPS = 1e-8
 
+SIMULATE_TIMES = 2
+CPUCT = 1
 
 class MCTS():
     """
     This class handles the MCTS tree.
     """
 
-    def __init__(self, game, nnet, args):
-        self.game = game
+    def __init__(self, nnet):
         self.nnet = nnet
-        self.args = args
         self.Qsa = {}  # stores Q values for s,a (as defined in the paper)
         self.Nsa = {}  # stores #times edge s,a was visited
         self.Ns = {}  # stores #times board s was visited
@@ -24,7 +25,7 @@ class MCTS():
         self.Es = {}  # stores game.getGameEnded ended for board s
         self.Vs = {}  # stores game.getValidMoves for board s
 
-    def getActionProb(self, canonicalBoard, temp=1):
+    def getActionProb(self, gameInstance, temp=1):
         """
         This function performs numMCTSSims simulations of MCTS starting from
         canonicalBoard.
@@ -33,11 +34,11 @@ class MCTS():
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)
         """
-        for i in range(self.args.numMCTSSims):
-            self.search(canonicalBoard)
+        for i in range(SIMULATE_TIMES):
+            self.search(gameInstance)
 
-        s = self.game.stringRepresentation(canonicalBoard)
-        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.game.getActionSize())]
+        s = str(gameInstance.instance)
+        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(Action.LEN_ACTION_CANDIDATE)]
 
         if temp == 0:
             bestA = np.argmax(counts)
@@ -47,9 +48,10 @@ class MCTS():
 
         counts = [x ** (1. / temp) for x in counts]
         probs = [x / float(sum(counts)) for x in counts]
-        return probs
+        #print gameInstance.valid_action_instance()
+        return np.array(probs) * gameInstance.valid_action_instance()
 
-    def search(self, canonicalBoard):
+    def search(self, gameInstance):
         """
         This function performs one iteration of MCTS. It is recursively called
         till a leaf node is found. The action chosen at each node is one that
@@ -69,18 +71,19 @@ class MCTS():
             v: the negative of the value of the current canonicalBoard
         """
 
-        s = self.game.stringRepresentation(canonicalBoard)
+        s = str(gameInstance.instance)
 
         if s not in self.Es:
-            self.Es[s] = self.game.getGameEnded(canonicalBoard, 1)
+            self.Es[s] = gameInstance.is_game_end()
+
         if self.Es[s] != 0:
             # terminal node
             return -self.Es[s]
 
         if s not in self.Ps:
             # leaf node
-            self.Ps[s], v = self.nnet.predict(canonicalBoard)
-            valids = self.game.getValidMoves(canonicalBoard, 1)
+            self.Ps[s], v = self.nnet.predict(gameInstance.instance)
+            valids = gameInstance.valid_action_instance()
             self.Ps[s] = self.Ps[s] * valids  # masking invalid moves
             sum_Ps_s = np.sum(self.Ps[s])
             if sum_Ps_s > 0:
@@ -103,25 +106,26 @@ class MCTS():
         best_act = -1
 
         # pick the action with the highest upper confidence bound
-        for a in range(self.game.getActionSize()):
+        for a in range(Action.LEN_ACTION_CANDIDATE):
             if valids[a]:
                 if (s, a) in self.Qsa:
-                    u = self.Qsa[(s, a)] + self.args.cpuct * self.Ps[s][a] * math.sqrt(self.Ns[s]) / (
+                    u = self.Qsa[(s, a)] + CPUCT * self.Ps[s][a] * math.sqrt(self.Ns[s]) / (
                                 1 + self.Nsa[(s, a)])
                 else:
-                    u = self.args.cpuct * self.Ps[s][a] * math.sqrt(self.Ns[s] + EPS)  # Q = 0 ?
+                    u = CPUCT * self.Ps[s][a] * math.sqrt(self.Ns[s] + EPS)  # Q = 0 ?
 
                 if u > cur_best:
                     cur_best = u
                     best_act = a
 
         a = best_act
-        next_s, next_player = self.game.getNextState(canonicalBoard, 1, a)
-        # TODO simulate valid remain 3 players' state by current state while in real game
-        # TODO simulate next player's state, chose simulated state which has best v.
-        next_s = self.game.getCanonicalForm(next_s, next_player)
+        simulated_v_list = []
+        for _ in range(SIMULATE_TIMES):
+            nextGameInstance = gameInstance.simulate_next_state(a)
+            _v = self.search(nextGameInstance)
+            simulated_v_list.append(_v)
 
-        v = self.search(next_s)
+        v = float(sum(simulated_v_list)) / SIMULATE_TIMES
 
         if (s, a) in self.Qsa:
             self.Qsa[(s, a)] = (self.Nsa[(s, a)] * self.Qsa[(s, a)] + v) / (self.Nsa[(s, a)] + 1)
